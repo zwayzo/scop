@@ -1,94 +1,129 @@
---> OpenGL est une spécification (un standard), pas une librairie. C'est le driver de ta carte graphique qui l'implémente. Du coup, les fonctions OpenGL ne sont pas dans un .lib classique qu'on link normalement — elles sont cachées dans le driver, et il faut aller les chercher à la main au runtime.
+*This project has been created as part of the 42 curriculum by moazzedd.*
 
-📜 Une spécification vs une librairie
-Une librairie c'est du code compilé, prêt à l'emploi. Par exemple libm.a contient le code de sin(), cos(), etc. Tu la links et c'est tout.
-Une spécification c'est juste un document qui dit :
+# SCOP — Introduction to GPU Rendering
 
-"La fonction glDrawArrays doit exister, prendre ces paramètres, et faire ce comportement."
+## Description
 
-Mais qui écrit le vrai code qui exécute glDrawArrays ? C'est NVIDIA, AMD, Apple, Intel — les fabricants de cartes graphiques. Chacun écrit son propre code optimisé pour son hardware, en respectant la spécification.
+SCOP is a 42 school project focused on introduction to GPU rendering using OpenGL.
+The goal is to build a small program that loads a 3D object from a `.obj` file, parses it manually, and renders it in real time using OpenGL 3.3 Core Profile.
 
-🎯 Analogie concrète
-C'est comme le HTML :
+The program displays the 3D object in perspective projection, allows the user to rotate and translate it along its three main axes, and supports toggling between a colored view (faces in distinct shades of gray) and a textured view, with a smooth transition between the two.
 
-Le W3C définit la spécification : "la balise <button> doit être cliquable"
-Mais c'est Chrome, Firefox, Safari qui implémentent chacun leur moteur
+All rendering-related code is written from scratch: matrix math, `.obj` parser, shader loader, and texture loader — no external library is used for these parts.
 
-Tu n'installes pas "HTML" sur ta machine — tu installes un navigateur qui l'implémente.
-Pour OpenGL c'est pareil :
+## Features
 
-Khronos Group définit la spec
-NVIDIA/AMD/Apple livrent l'implémentation dans leur driver GPU
+- `.obj` file parser (vertices, faces)
+- Perspective projection (objects farther away appear smaller)
+- Rotation on X, Y, Z axes
+- Translation on X, Y, Z axes
+- Per-face coloring with shades of gray
+- BMP texture loader (no external library)
+- Smooth color ↔ texture transition via `uBlend` uniform
+- Cross-platform: macOS and Linux (no `sudo` required on Linux)
 
+## Instructions
 
----> GLFW = Graphics Library FrameWork
-C'est une librairie C qui s'occupe de tout ce qui est autour d'OpenGL, mais pas OpenGL lui-même.
+### Dependencies
 
-Le problème qu'elle résout
-OpenGL ne sait faire qu'une chose : dessiner des pixels. Mais pour dessiner, il te faut d'abord :
+Install all required dependencies with a single command:
 
-Une fenêtre
-Un contexte OpenGL attaché à cette fenêtre
-Pouvoir lire le clavier et la souris
+```bash
+make deps
+```
 
-Or, créer une fenêtre est complètement différent selon l'OS :
+- **macOS** : installs GLFW via Homebrew
+- **Linux** : clones and compiles GLFW locally (no sudo required)
 
+GLAD (OpenGL function loader) is already included in `include/glad/`.
 
-GLFW                          GLAD
-────────────────────          ────────────────────
-Crée la fenêtre               Déverrouille les fonctions OpenGL
-Gère clavier/souris           du driver de ta carte graphique
-Gère le contexte OpenGL
+### Compilation
 
-glfwCreateWindow()            glDrawArrays()
-glfwPollEvents()              glClearColor()
-glfwSwapBuffers()             glUseProgram()
+```bash
+make
+```
 
+### Usage
 
-GLAD = GL Loader-Generator
-On en a parlé rapidement avant, mais voilà l'explication complète.
+```bash
+./scop <file.obj>
+```
 
-Le problème qu'il résout
-Les fonctions OpenGL modernes comme glDrawArrays(), glUseProgram(), etc. ne sont pas dans une librairie classique. Elles sont cachées dans le driver de ta carte graphique.
-Pour les utiliser, il faudrait normalement faire ça à la main pour chaque fonction :
-c// Sans GLAD — pour UNE SEULE fonction
-typedef void (*GL_DrawArrays)(GLenum, GLint, GLsizei);
-GL_DrawArrays glDrawArrays = NULL;
-glDrawArrays = (GL_DrawArrays)glfwGetProcAddress("glDrawArrays");
-Il y a plus de 500 fonctions OpenGL. C'est impossible à faire manuellement.
+Example:
+```bash
+./scop assets/42.obj
+./scop assets/cube.obj
+```
 
-Ce que GLAD fait
-Tu lui donnes juste une fonction qui sait chercher dans le driver (glfwGetProcAddress), et il fait le travail pour toutes les fonctions d'un coup :
-cgladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
-// ✅ les 500+ fonctions sont maintenant disponibles
+### Controls
 
-SHADERS
+| Key | Action |
+|---|---|
+| `A` / `D` | Rotate around Y axis |
+| `W` / `S` | Rotate around X axis |
+| `Q` / `E` | Rotate around Z axis |
+| `←` / `→` | Translate on X axis |
+| `↑` / `↓` | Translate on Y axis |
+| `+` / `-` | Translate on Z axis |
+| `T` | Toggle texture (smooth transition) |
+| `R` | Reset position |
+| `Escape` | Quit |
 
-C'est quoi un shader ?
-Un shader c'est un petit programme que tu écris et qui tourne sur le GPU (pas sur ton CPU comme le reste de ton code C).
-Il y en a deux types, et ils s'exécutent dans cet ordre à chaque frame :
-ton code C (CPU)
-      │
-      │  envoie les points 3D
-      ▼
-┌─────────────────────┐
-│   VERTEX SHADER     │  → "où est ce point sur l'écran ?"
-└─────────────────────┘
-          │
-          │  pour chaque pixel couvert
-          ▼
-┌─────────────────────┐
-│   FRAGMENT SHADER   │  → "quelle couleur a ce pixel ?"
-└─────────────────────┘
-          │
-          ▼
-      écran 🖥️
+### Cleanup
 
-Le langage : GLSL
-Les shaders s'écrivent en GLSL (GL Shading Language). C'est du C, mais simplifié, avec des types spéciaux pour la 3D.
-Les types importants à connaître :
-glslfloat    // nombre décimal
-vec2     // 2 floats (x, y)
-vec3     // 3 floats (x, y, z)  ← position 3D
-vec4     // 4 floats (x, y, z, w) ← position homogène
-mat4     // matrice 4x4 ← transformations 3D
+```bash
+make clean      # remove object files
+make fclean     # remove object files + binary
+make distclean  # fclean + remove locally compiled libs (Linux)
+make re         # full recompile
+```
+
+## Technical Choices
+
+- **Language** : C (c11)
+- **Graphics API** : OpenGL 3.3 Core Profile
+- **Window/Events** : GLFW (only authorized external library)
+- **GL Loader** : GLAD (included as source files, not an external library)
+- **Texture format** : BMP 24-bit (parsed manually, supports both standard and top-down BMP)
+- **Matrix math** : custom `mat4` and `vec3` implementation (column-major, compatible with OpenGL)
+- **Projection** : perspective matrix built from scratch (`mat4_perspective`)
+- **Camera** : look-at matrix built from scratch (`mat4_look_at`)
+- **Object centering** : geometric center computed from bounding box, applied before rotation so the object spins around its own axis
+
+## Project Structure
+
+```
+scop/
+├── Makefile
+├── README.md
+├── assets/          # .obj files and texture
+├── shaders/
+│   ├── vertex.glsl
+│   └── fragment.glsl
+├── include/
+│   ├── glad/        # GLAD OpenGL loader
+│   └── KHR/
+└── src/
+    ├── main.c
+    ├── window.c/h   # GLFW window + input handling
+    ├── shader.c/h   # GLSL shader compiler + linker
+    ├── mesh.c/h     # GPU mesh (VAO/VBO) builder
+    ├── obj_parser.c/h
+    ├── texture.c/h  # BMP texture loader
+    └── math/
+        ├── vec3.c/h
+        └── mat4.c/h
+```
+
+## Resources
+
+- [OpenGL Documentation (docs.gl)](https://docs.gl) — reference for all OpenGL functions
+- [LearnOpenGL](https://learnopengl.com) — tutorials on shaders, textures, transformations
+- [The OBJ file format specification](http://paulbourke.net/dataformats/obj/) — complete .obj format reference
+- [Perspective Projection Matrix](https://www.songho.ca/opengl/gl_projectionmatrix.html) — math behind perspective projection
+- [GLFW Documentation](https://www.glfw.org/docs/latest/) — window and input management
+- [Column-major matrices in OpenGL](https://www.opengl.org/archives/resources/faq/technical/transformations.htm)
+
+### AI Usage
+
+Claude (claude.ai) was used for guidance on the initial project structure and Makefile setup. All rendering code, mathematics, parser, and shader logic were written and understood manually as part of the learning process.

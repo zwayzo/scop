@@ -6,7 +6,7 @@
 #include "texture.h"
 #include <stdio.h>
 
-int main(void)
+int main(int argc, char **argv)
 {
     GLFWwindow  *window;
     GLuint      shader;
@@ -16,15 +16,24 @@ int main(void)
     t_transform tr;
     t_vec3      center;
     int         loc;
-    float       blend;       // 0.0 = couleur, 1.0 = texture
-    int         tex_on;      // est-ce qu'on va vers la texture ?
-    int         t_pressed;   // évite la répétition de la touche T
+    float       blend;
+    int         tex_on;
+    int         t_pressed;
+
+    // Vérifie qu'on a bien un fichier .obj en argument
+    if (argc != 2)
+    {
+        fprintf(stderr, "Usage : ./scop <fichier.obj>\n");
+        fprintf(stderr, "Exemple : ./scop assets/42.obj\n");
+        return (1);
+    }
 
     window = window_create();
     if (!window)
         return (1);
 
-    obj = obj_load("assets/cube.obj");
+    // Utilise le fichier passé en argument
+    obj = obj_load(argv[1]);
     if (!obj)
     {
         window_destroy(window);
@@ -66,7 +75,14 @@ int main(void)
     t_pressed      = 0;
 
     printf("✅ OpenGL %s\n", glGetString(GL_VERSION));
-    printf("   T → toggle texture\n");
+    printf("🎮 Contrôles :\n");
+    printf("   WASD       → rotation\n");
+    printf("   Q/E        → roulis\n");
+    printf("   Flèches    → translation X/Y\n");
+    printf("   +/-        → translation Z\n");
+    printf("   T          → toggle texture\n");
+    printf("   R          → reset\n");
+    printf("   Echap      → quitter\n");
 
     while (!glfwWindowShouldClose(window))
     {
@@ -75,7 +91,6 @@ int main(void)
 
         window_handle_input(window, &tr);
 
-        // Toggle texture avec T (détection appui unique)
         if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS && !t_pressed)
         {
             tex_on = !tex_on;
@@ -84,17 +99,13 @@ int main(void)
         if (glfwGetKey(window, GLFW_KEY_T) == GLFW_RELEASE)
             t_pressed = 0;
 
-        // Transition douce : blend s'approche de 0.0 ou 1.0
         if (tex_on && blend < 1.0f)
             blend += 0.02f;
         else if (!tex_on && blend > 0.0f)
             blend -= 0.02f;
-
-        // Clamp entre 0 et 1
         if (blend > 1.0f) blend = 1.0f;
         if (blend < 0.0f) blend = 0.0f;
 
-        // MVP
         t_mat4 model = transform_to_model(&tr, center);
         t_mat4 view  = mat4_look_at(
             (t_vec3){0, 0, 5.0f},
@@ -109,16 +120,10 @@ int main(void)
         t_mat4 mvp = mat4_multiply(mat4_multiply(proj, view), model);
 
         shader_use(shader);
-
-        // Envoie la MVP
         loc = glGetUniformLocation(shader, "uMVP");
         glUniformMatrix4fv(loc, 1, GL_FALSE, mat4_ptr(&mvp));
-
-        // Envoie le blend
         loc = glGetUniformLocation(shader, "uBlend");
         glUniform1f(loc, blend);
-
-        // Bind la texture sur l'unité 0
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
         loc = glGetUniformLocation(shader, "uTexture");
@@ -136,3 +141,8 @@ int main(void)
     window_destroy(window);
     return (0);
 }
+
+
+
+
+//  sips -s format bmp  ../../../Downloads/pngtree-abstract-cloudy-background-beautiful-natural-streaks-of-sky-and-clouds-red-image_15684333.jpg --out assets/texture.bmp\n
